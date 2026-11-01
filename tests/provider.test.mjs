@@ -42,7 +42,7 @@ test('start uses a fixed official actor, authorization header, bounded cost/time
   assert.equal(url.searchParams.get('timeout'), '180');
   assert.equal(url.searchParams.has('token'), false);
   assert.equal(requested.options.headers.Authorization, `Bearer ${token}`);
-  assert.equal(requested.options.redirect, 'error');
+  assert.equal(requested.options.redirect, 'manual');
   const input = JSON.parse(requested.options.body);
   assert.deepEqual(input.startUrls, [{ url: libraryUrl }]);
   assert.equal(input.resultsLimit, 20);
@@ -88,6 +88,26 @@ test('provider failure never relays raw provider details or token', async () => 
       assert.doesNotMatch(error.message, /secret|apify_api_test_only|pet\+grooming/);
       return true;
     });
+  }
+});
+
+test('redirects are rejected once without forwarding credentials or exposing the destination', async () => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    let calls = 0;
+    await assert.rejects(researchAction({ action: 'start', token, libraryUrl, acceptProviderCosts: true }, {
+      fetchImpl: async (url, options) => {
+        calls++;
+        assert.equal(new URL(url).origin, 'https://api.apify.com');
+        assert.equal(options.redirect, 'manual');
+        return new Response(`${token} secret-response`, { status, headers: { location: 'https://attacker.example/secret-destination' } });
+      },
+    }), (error) => {
+      assert.equal(error.code, 'provider_redirect');
+      assert.equal(error.status, 502);
+      assert.doesNotMatch(error.message, /apify_api_test_only|attacker|secret/);
+      return true;
+    });
+    assert.equal(calls, 1);
   }
 });
 

@@ -52,7 +52,7 @@ test('start requests US bestsellers without keywords at a fixed cost and timeout
   assert.equal(url.searchParams.get('timeout'), '180');
   assert.equal(url.searchParams.has('token'), false);
   assert.equal(request.options.headers.Authorization, `Bearer ${token}`);
-  assert.equal(request.options.redirect, 'error');
+  assert.equal(request.options.redirect, 'manual');
   assert.deepEqual(JSON.parse(request.options.body), { mode: 'bestsellers', bestsellersRegion: 'US', maxResults: 30, trackSoldSinceLastRun: false });
 });
 
@@ -121,6 +121,26 @@ test('provider errors do not reveal raw details or tokens', async () => {
       assert.doesNotMatch(error.message, /apify_api_test_only|secret-provider-details/);
       return true;
     });
+  }
+});
+
+test('redirects are rejected once without following or exposing the destination', async () => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    let requests = 0;
+    await assert.rejects(discoveryAction({ action: 'start', token, acceptProviderCosts: true }, {
+      fetchImpl: async (url, options) => {
+        requests++;
+        assert.equal(new URL(url).origin, 'https://api.apify.com');
+        assert.equal(options.redirect, 'manual');
+        return new Response(`${token} secret-response`, { status, headers: { location: 'https://attacker.example/secret-destination' } });
+      },
+    }), (error) => {
+      assert.equal(error.code, 'provider_redirect');
+      assert.equal(error.status, 502);
+      assert.doesNotMatch(error.message, /apify_api_test_only|attacker|secret/);
+      return true;
+    });
+    assert.equal(requests, 1);
   }
 });
 
