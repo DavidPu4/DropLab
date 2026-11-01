@@ -4,7 +4,7 @@ A product research and experiment workspace for ecommerce. DropLab helps you dec
 
 ## Windows desktop app
 
-Get the portable Windows build from the [latest GitHub release](https://github.com/DavidPu4/DropLab/releases/latest). This repository and its releases are private; access requires permission from the owner.
+Get the portable Windows build from the [latest GitHub release](https://github.com/DavidPu4/DropLab/releases/latest).
 
 Extract the complete `DropLab-0.2.0-Windows-x64.zip` into a folder, then open **DropLab.exe**. The ZIP includes its own runtime; Node.js, a running development server, and ChatGPT sign-in are not required. Live product discovery still needs an internet connection and your own Apify token.
 
