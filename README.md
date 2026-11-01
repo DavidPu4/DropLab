@@ -4,20 +4,30 @@ A product research and experiment workspace for ecommerce. DropLab helps you dec
 
 ## Use it
 
-1. Explore the labeled sample workspace to understand the workflow.
-2. Start an empty workspace, add a lead manually, or import a product CSV.
-3. Open a product and enter its selling price, unit cost, shipping, payment fees, and expected refund rate. Unknown values stay blank.
-4. Review the source evidence and compare research priorities. Move a promising product to your shortlist.
-5. After running your own small test, record spend, orders, revenue, refunds, and traffic. Review contribution profit alongside CPA and ROAS.
-6. Export a JSON backup regularly. Records are stored in this browser; another browser, localhost, and the published site each have separate storage.
+1. Open **Discover**, connect your Apify API token, and choose **Find US bestsellers**. No product link, keyword, or CSV is needed.
+2. Browse the returned TikTok Shop listings. Review price, seller, ratings, reviews, and platform-reported cumulative units sold. Save promising leads to **My research** or your shortlist.
+3. In My research, enter your planned selling price, unit cost, shipping, payment fees, and expected refund rate. Unknown values stay blank. The observed marketplace price is a reference, not a verified supplier quote or your revenue.
+4. Compare the evidence and economics before deciding what deserves a small test. Manual products, CSV imports, and clearly labeled fictional examples remain available in My research.
+5. After running your own test, record spend, orders, revenue, refunds, and traffic. Review contribution profit alongside CPA and ROAS.
+6. Export a JSON backup regularly. Saved research, test results, and the latest discovery snapshot are stored in this browser; another browser, localhost, and the published site each have separate storage.
 
 All money fields currently use USD. Percentage fields use whole percentages: `2.9` means 2.9%. Example records and test results are fictional and are labeled in the interface. Real imports do not receive made-up cost or sales data.
 
-## Optional live research
+## Automatic product discovery
+
+DropLab uses the community-maintained [`wheaten_steelpan/tiktok-shop-scraper`](https://apify.com/wheaten_steelpan/tiktok-shop-scraper) actor in `bestsellers` mode for the US market. The default request asks for 30 products from the whole market. It requires no product to be identified first. This connector is experimental: the actor is independently maintained, has limited adoption, and may stop returning data if its upstream source changes. Failed or empty runs show errors or warnings rather than manufactured product recommendations.
+
+Create an [Apify free account](https://console.apify.com/sign-up), open [Settings → Integrations](https://console.apify.com/settings/integrations), and enter your API token in DropLab's discovery connection form. According to [Apify's current pricing](https://apify.com/pricing), Free includes $5/month in usage credits with no credit card required; the platform blocks free-account usage when those credits are exhausted. Each actor has its own pricing and limits. The chosen actor currently limits free runs to 100 product rows; DropLab requests fewer and asks the provider to cap each run at $0.25. Check provider pricing before starting. DropLab does not upgrade your account or select a paid subscription.
+
+No discovery run starts on page load or automatically retries after an ambiguous failure. The user explicitly accepts possible credit usage and starts or refreshes the feed. The token stays in the current React session, is sent through this app's server to Apify as a bearer credential, and is excluded from browser storage, backups, URLs, source code, and logs. Reloading clears the token; cached results remain available with their observation dates. Provider run and dataset ownership are checked before reading results or cancelling a run.
+
+Reported units sold are **cumulative/lifetime counts**, not sales in the last day, week, or month. One snapshot cannot establish sales growth or revenue. No sales velocity, recent GMV, profit, or likelihood of success is invented. Discovery ranking and your later economic research score have separate purposes. Product photos are restricted to supported TikTok CDN hosts, and original listing links remain available for verification.
+
+## Optional ad research
 
 The live connector uses Apify's `apify/facebook-ads-scraper` actor with a Meta Ads Library search URL. An Apify account and token are required; actor availability and provider charges are controlled by Apify. No provider requests start until the user enters a token, accepts the possible charges, and explicitly starts a run.
 
-Tokens live only in the current UI session. They are sent over HTTPS to this app's server, then as a bearer token to the fixed Apify API host. Tokens are not saved in workspace backups or browser storage. Close the connector or reload the page to clear them. The server validates URL hosts, bounds request sizes and result counts, and returns sanitized errors.
+Ad-research tokens also live only in the current UI session. They are sent over HTTPS to this app's server, then as a bearer token to the fixed Apify API host. Tokens are not saved in workspace backups or browser storage. Close the ad connector or reload the page to clear them. The server validates URL hosts, bounds request sizes and result counts, and returns sanitized errors.
 
 Discovery returns **ad leads**, which may require manual product identification. An active advertisement is evidence that someone is advertising; it is not evidence of their sales or profit. Missing ad status stays unknown. Review original links and independently verify supplier quality, costs, delivery, and demand before spending money.
 
@@ -57,7 +67,9 @@ The Sites framework integration in `vite.config.ts` and `.openai/hosting.json` i
 
 ## Main code
 
-- `app/page.tsx`, `app/components/`: interface, local persistence, and workflows
+- `app/page.tsx`, `app/components/`: discovery feed, saved research, local persistence, and workflows
+- `lib/discovery.js`: canonical marketplace leads, safe URLs, deduplication, and conversion to research products
+- `lib/tiktok-provider.js`, `app/api/discovery/route.ts`: bounded automatic TikTok bestseller discovery
 - `lib/domain.js`: normalization, research scoring, economics, and experiment metrics
 - `lib/importers.js`: CSV and validated JSON backup handling
 - `lib/demo.js`: clearly labeled fictional sample records
@@ -67,6 +79,6 @@ The Sites framework integration in `vite.config.ts` and `.openai/hosting.json` i
 
 ## Limits
 
-This first version has no background crawler, automatic ad purchases, store integration, cross-device synchronization, or trained prediction model. Clearing site data removes local records unless you exported a backup. Live provider behavior is tested with mocked responses; a real paid run requires your own credentials and explicit action.
+This version has no unattended background crawler, automatic ad purchases, store integration, cross-device synchronization, or trained prediction model. It is not a replacement for a commercial platform's historical market database. Clearing site data removes local records unless you exported a backup. Live provider behavior is tested with mocked responses; a real run using provider credits requires your own credentials and explicit action. The app cannot independently verify marketplace-reported sales counts.
 
 Source references: [Apify actor](https://apify.com/apify/facebook-ads-scraper), [Apify API](https://docs.apify.com/api/v2), [Meta Ads Library](https://www.facebook.com/ads/library/).
