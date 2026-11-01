@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeDiscoveryLead, discoveryLeadToProduct, mergeDiscoveryLeads } from '../lib/discovery.js';
+import { normalizeDiscoveryLead, discoveryLeadToProduct, mergeDiscoveryLeads, recordDiscoverySnapshot, getDiscoveryTrend, normalizeDiscoveryHistory } from '../lib/discovery.js';
 import { normalizeProduct, calculateEconomics, scoreProduct } from '../lib/domain.js';
 import { validateBackup } from '../lib/importers.js';
 
@@ -82,4 +82,85 @@ test('old version-one backups remain valid and optional discovery feed round-tri
   assert.throws(()=>validateBackup({products:[],experiments:[],discovery:{leads:Array(101).fill(lead)}}),/100 leads/);
   assert.throws(()=>validateBackup({products:[],experiments:[],discovery:[]}),/leads array/);
   assert.equal(validateBackup({products:[],experiments:[],discovery:{leads:[],updatedAt:'2999-01-01'}}).discovery.updatedAt,null);
+});
+
+const point = (observedAt,lifetimeSold,overrides={}) => ({observedAt,lifetimeSold,listingPrice:24.99,acquisition:'live',...overrides});
+const trackedLead = (observedAt,lifetimeSold,overrides={}) => normalizeDiscoveryLead(makeLead({observedAt,lifetimeSold,...overrides}));
+
+test('first genuine discovery records one point without generating a sales trend',()=>{
+  const lead=trackedLead('2026-10-01T00:00:00Z',1200);
+  const feed=recordDiscoverySnapshot(undefined,[lead],'2026-10-02T00:00:00Z');
+  assert.equal(feed.history[lead.id].length,1);assert.equal(feed.history[lead.id][0].observedAt,lead.observedAt);
+  const trend=getDiscoveryTrend(lead,feed.history[lead.id]);
+  assert.equal(trend.change,null);assert.equal(trend.changePercent,null);assert.equal(trend.windowHours,null);
+});
+test('a real prior cached snapshot can be retained without inventing dates or intermediate sales',()=>{
+  const previous=trackedLead('2026-09-30T00:00:00Z',1000);
+  const latest=trackedLead('2026-10-01T12:00:00Z',1200);
+  const feed=recordDiscoverySnapshot({leads:[previous],updatedAt:'2026-09-30T01:00:00Z'},[latest],'2026-10-02T00:00:00Z');
+  assert.deepEqual(feed.leads,[latest]);assert.equal(feed.history[latest.id].length,2);
+  const trend=getDiscoveryTrend(latest,feed.history[latest.id]);
+  assert.equal(trend.change,200);assert.equal(trend.changePercent,20);assert.equal(trend.windowHours,36);
+  assert.deepEqual(trend.points.map(value=>value.observedAt),[previous.observedAt,latest.observedAt]);
+});
+test('repeated fetches of the same source timestamp do not manufacture chart observations',()=>{
+  const lead=trackedLead('2026-10-01T00:00:00Z',1200);
+  const first=recordDiscoverySnapshot(undefined,[lead],'2026-10-02T00:00:00Z');
+  const repeated=recordDiscoverySnapshot(first,[lead,lead],'2026-10-03T00:00:00Z');
+  assert.equal(repeated.history[lead.id].length,1);
+  assert.equal(getDiscoveryTrend(lead,repeated.history[lead.id]).change,null);
+  assert.equal(repeated.updatedAt,'2026-10-03T00:00:00.000Z');
+});
+test('unknown and future source dates never borrow a fetch timestamp to seed history',()=>{
+  const unknown=normalizeDiscoveryLead(makeLead({observedAt:null}));
+  const feed=recordDiscoverySnapshot(undefined,[unknown],'2026-10-02T00:00:00Z');
+  assert.deepEqual(feed.history,{});
+  const history=normalizeDiscoveryHistory({[unknown.id]:[point('invalid',100),point('2999-01-01T00:00:00Z',200)]});
+  assert.deepEqual(history,{});
+});
+test('demo snapshots do not seed invented history or join an actual provider trend',()=>{
+  const demo=trackedLead('2026-10-01T00:00:00Z',1200,{acquisition:'demo'});
+  assert.deepEqual(recordDiscoverySnapshot(undefined,[demo],'2026-10-02T00:00:00Z').history,{});
+  const live=trackedLead('2026-10-02T00:00:00Z',1400);
+  const history=[point('2026-10-01T00:00:00Z',1200,{acquisition:'demo'}),point('2026-10-02T00:00:00Z',1400)];
+  const trend=getDiscoveryTrend(live,history);
+  assert.equal(trend.points.length,1);assert.equal(trend.points[0].acquisition,'live');assert.equal(trend.change,null);
+});
+test('a decreasing cumulative counter invalidates inferred change even when the last total recovers',()=>{
+  const lead=trackedLead('2026-10-03T00:00:00Z',1300);
+  const history=[point('2026-10-01T00:00:00Z',1000),point('2026-10-02T00:00:00Z',900),point('2026-10-03T00:00:00Z',1300)];
+  const trend=getDiscoveryTrend(lead,history);
+  assert.equal(trend.points.length,3);assert.equal(trend.change,null);assert.equal(trend.changePercent,null);assert.equal(trend.windowHours,48);
+});
+test('unknown endpoint counts keep change unknown and zero baselines avoid percentage division',()=>{
+  const lead=trackedLead('2026-10-02T00:00:00Z',10);
+  assert.equal(getDiscoveryTrend(lead,[point('2026-10-01T00:00:00Z',null),point('2026-10-02T00:00:00Z',10)]).change,null);
+  assert.equal(getDiscoveryTrend(lead,[point('2026-10-01T00:00:00Z',5),point('2026-10-02T00:00:00Z',null)]).change,null);
+  const zero=getDiscoveryTrend(lead,[point('2026-10-01T00:00:00Z',0),point('2026-10-02T00:00:00Z',10)]);
+  assert.equal(zero.change,10);assert.equal(zero.changePercent,null);
+});
+test('history is sorted, deduplicated and bounded to 30 genuine points per product',()=>{
+  const lead=trackedLead('2026-10-10T00:00:00Z',40);
+  const history=Array.from({length:40},(_,index)=>point(new Date(Date.UTC(2026,8,index+1)).toISOString(),index+1)).reverse();
+  const normalized=normalizeDiscoveryHistory({[lead.id]:[...history,history[0],point(history[0].observedAt,999,{acquisition:'demo'})]});
+  assert.equal(normalized[lead.id].length,30);assert.equal(normalized[lead.id][0].lifetimeSold,11);
+  assert.equal(normalized[lead.id].at(-1).lifetimeSold,40);assert.ok(normalized[lead.id].every(value=>value.acquisition==='live'));
+});
+test('recording caps history at 100 product IDs and prioritizes products in the latest feed',()=>{
+  const previous={};
+  for(let index=0;index<100;index++) previous[`tiktok-${10000+index}`]=[point('2026-09-01T00:00:00Z',index)];
+  const next=trackedLead('2026-10-01T00:00:00Z',1200);
+  const feed=recordDiscoverySnapshot({leads:[],updatedAt:null,history:previous},[next],'2026-10-02T00:00:00Z');
+  assert.equal(Object.keys(feed.history).length,100);assert.equal(feed.history[next.id].length,1);
+  assert.ok(!Object.hasOwn(normalizeDiscoveryHistory(JSON.parse('{"__proto__":[]}')),'__proto__'));
+});
+test('history survives backup round trips while old feeds stay unchanged and malformed bounds are rejected',()=>{
+  const lead=trackedLead('2026-10-02T00:00:00Z',1200);
+  const discovery={leads:[lead],updatedAt:lead.observedAt,history:{[lead.id]:[point('2026-10-01T00:00:00.000Z',1000),point(lead.observedAt,1200)]}};
+  const restored=validateBackup(JSON.parse(JSON.stringify({version:1,products:[],experiments:[],discovery})));
+  assert.deepEqual(restored.discovery,discovery);assert.equal(getDiscoveryTrend(lead,restored.discovery.history[lead.id]).change,200);
+  const legacy=validateBackup({products:[],experiments:[],discovery:{leads:[lead],updatedAt:null}});
+  assert.equal(Object.hasOwn(legacy.discovery,'history'),false);
+  assert.throws(()=>validateBackup({products:[],experiments:[],discovery:{leads:[],history:{[lead.id]:Array(31).fill(point(lead.observedAt,100))}}}),/30 observations/);
+  assert.throws(()=>validateBackup({products:[],experiments:[],discovery:{leads:[],history:JSON.parse('{"__proto__":[]}')}}),/invalid product key/);
 });

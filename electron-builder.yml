@@ -1,0 +1,28 @@
+appId: com.davidpu.droplab
+productName: DropLab
+copyright: Copyright © 2026 David Pu
+electronVersion: 45.2.1
+directories:
+  app: desktop/app
+  output: releases
+  buildResources: desktop/assets
+asar: true
+beforeBuild: desktop/before-build.cjs
+files:
+  - main.cjs
+  - protocol.cjs
+  - package.json
+  - icon.png
+  - renderer/**/*
+  - lib/*.js
+  - '!node_modules/**/*'
+  - '!**/*.map'
+win:
+  target:
+    - target: zip
+      arch:
+        - x64
+  artifactName: DropLab-${version}-Windows-x64.${ext}
+  signExecutable: false
+  requestedExecutionLevel: asInvoker
+compression: normal

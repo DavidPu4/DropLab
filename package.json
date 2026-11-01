@@ -1,7 +1,10 @@
 {
   "name": "droplab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "description": "Product discovery and experiment research for ecommerce.",
+  "author": "David Pu",
+  "main": "desktop/main.cjs",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -11,8 +14,14 @@
     "build": "node scripts/run-framework.mjs build",
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "test": "node --test tests/domain.test.mjs tests/provider.test.mjs tests/discovery.test.mjs tests/tiktok-provider.test.mjs tests/workerd-provider.test.mjs",
+    "test": "node --test tests/domain.test.mjs tests/provider.test.mjs tests/discovery.test.mjs tests/tiktok-provider.test.mjs tests/workerd-provider.test.mjs tests/desktop-protocol.test.mjs",
     "typecheck": "tsc --noEmit",
+    "desktop:build": "node desktop/build.mjs",
+    "predesktop:dev": "node desktop/build.mjs",
+    "desktop:dev": "electron .",
+    "predesktop:package": "node desktop/build.mjs",
+    "desktop:package": "electron-builder --config electron-builder.yml --win zip --x64",
+    "desktop:smoke": "electron . --smoke-test",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
@@ -51,6 +60,8 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
+    "electron": "45.2.1",
+    "electron-builder": "26.18.0",
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.4",
     "json-rpc-2.0": "1.7.1",

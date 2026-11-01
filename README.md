@@ -2,6 +2,16 @@
 
 A product research and experiment workspace for ecommerce. DropLab helps you decide **what deserves a small test**, then compare actual results against your costs. It does not promise that an ad, trend, or high score is a winning product.
 
+## Windows desktop app
+
+Extract the complete `DropLab-0.2.0-Windows-x64.zip` into a folder, then open **DropLab.exe**. The ZIP includes its own runtime; Node.js, a running development server, and ChatGPT sign-in are not required. Live product discovery still needs an internet connection and your own Apify token.
+
+The desktop app loads its bundled interface from `droplab://app` and stores its workspace in your Windows profile at `%APPDATA%\DropLab`. That stable app origin preserves saved work across restarts and ZIP updates. Tokens remain in memory for the current app session and are excluded from backups, releases, and source code. The ZIP contains no personal research or credentials.
+
+To move a browser workspace into the desktop app, use **Settings → Export backup** on the web app, then **Settings → Restore backup** in the desktop app. The two apps have separate local storage; the JSON backup transfers research, experiments, the discovery snapshot, and recorded observation history.
+
+The desktop layout uses a compact product table, a filter sidebar, sortable columns, selection and batch actions, CSV export, and optional product cards. It uses DropLab branding with a blue-and-white research workspace. Observed dates describe when data was recorded, not a sales attribution window.
+
 ## Use it
 
 1. Open **Discover**, connect your Apify API token, and choose **Find US bestsellers**. No product link, keyword, or CSV is needed.
@@ -21,7 +31,7 @@ Create an [Apify free account](https://console.apify.com/sign-up), open [Setting
 
 No discovery run starts on page load or automatically retries after an ambiguous failure. The user explicitly accepts possible credit usage and starts or refreshes the feed. The token stays in the current React session, is sent through this app's server to Apify as a bearer credential, and is excluded from browser storage, backups, URLs, source code, and logs. Reloading clears the token; cached results remain available with their observation dates. Provider run and dataset ownership are checked before reading results or cancelling a run.
 
-Reported units sold are **cumulative/lifetime counts**, not sales in the last day, week, or month. One snapshot cannot establish sales growth or revenue. No sales velocity, recent GMV, profit, or likelihood of success is invented. Discovery ranking and your later economic research score have separate purposes. Product photos are restricted to supported TikTok CDN hosts, and original listing links remain available for verification.
+Reported units sold are **cumulative/lifetime counts**, not sales in the last day, week, or month. One snapshot cannot establish sales growth or revenue. Repeated real observations can show the change since the first retained tracked observation; the app keeps up to 30 points per product for up to 100 products. Unknown counters, decreases, mixed sample/live provenance, or insufficient observations produce an unknown change rather than a misleading chart. No recent GMV, profit, or likelihood of success is invented. Discovery ranking and your later economic research score have separate purposes. Product photos are restricted to supported TikTok CDN hosts, and original listing links remain available for verification.
 
 ## Optional ad research
 
@@ -63,6 +73,16 @@ npx tsc --noEmit
 npm run build
 ```
 
+To build the Windows desktop version from source:
+
+```sh
+npm run desktop:build
+npm run desktop:smoke
+npm run desktop:package
+```
+
+The last command produces the Windows ZIP in `releases/`. Desktop smoke checks use an isolated temporary profile and make no provider requests that consume credits. Renderer code has no Node access; the sandboxed window talks to a bounded same-origin protocol handler. External HTTPS links open in the system browser.
+
 The Sites framework integration in `vite.config.ts` and `.openai/hosting.json` is preserved for private publication. Source tokens, local environment files, generated bundles, and workspace data are excluded from Git.
 
 ## Main code
@@ -70,6 +90,8 @@ The Sites framework integration in `vite.config.ts` and `.openai/hosting.json` i
 - `app/page.tsx`, `app/components/`: discovery feed, saved research, local persistence, and workflows
 - `lib/discovery.js`: canonical marketplace leads, safe URLs, deduplication, and conversion to research products
 - `lib/tiktok-provider.js`, `app/api/discovery/route.ts`: bounded automatic TikTok bestseller discovery
+- `desktop/main.cjs`, `desktop/protocol.cjs`: native window, local application protocol, shared provider API, and desktop startup checks
+- `desktop/build.mjs`, `electron-builder.yml`: standalone renderer staging and Windows ZIP packaging
 - `lib/domain.js`: normalization, research scoring, economics, and experiment metrics
 - `lib/importers.js`: CSV and validated JSON backup handling
 - `lib/demo.js`: clearly labeled fictional sample records
@@ -79,6 +101,6 @@ The Sites framework integration in `vite.config.ts` and `.openai/hosting.json` i
 
 ## Limits
 
-This version has no unattended background crawler, automatic ad purchases, store integration, cross-device synchronization, or trained prediction model. It is not a replacement for a commercial platform's historical market database. Clearing site data removes local records unless you exported a backup. Live provider behavior is tested with mocked responses; a real run using provider credits requires your own credentials and explicit action. The app cannot independently verify marketplace-reported sales counts.
+This version has no unattended background crawler, automatic ad purchases, store integration, cross-device synchronization, or trained prediction model. It is not a replacement for a commercial platform's historical market database. Clearing app or browser data removes local records unless you exported a backup. Provider behavior has mocked and Workers-runtime regression coverage; the hosted connector was also verified with one real 30-product run. New runs using provider credits require your own credentials and explicit action. The app cannot independently verify marketplace-reported sales counts.
 
 Source references: [Apify actor](https://apify.com/apify/facebook-ads-scraper), [Apify API](https://docs.apify.com/api/v2), [Meta Ads Library](https://www.facebook.com/ads/library/).
